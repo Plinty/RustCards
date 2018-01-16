@@ -42,6 +42,7 @@ pub enum Value {
     Three,
     Two,
 }
+
 impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Value) -> Option<Ordering> {
         Some(self.cmp(other))

@@ -1,31 +1,49 @@
-use std::cmp::{Ord, Ordering, PartialOrd};
 use cards::{Card, Value};
 
 #[derive(Debug, Clone, Copy)]
-struct Pokerhand {
-    cards: [Card; 5],
+pub struct Pokerhand {
+    pub cards: [Card; 5],
 }
 
 impl Pokerhand {
-    fn score(&self) -> HandScore {
-        unimplemented!();
+    fn score(self) -> HandScore {
+        match (self.is_straight(), self.is_flush()) {
+            (true, true) => return HandScore::StraightFlush(StraightScore::new(self).unwrap()),
+            (false, true) => return HandScore::Flush(FlushScore::new(self).unwrap()),
+            (true, false) => return HandScore::Straight(StraightScore::new(self).unwrap()),
+            (false, false) => {}
+        }
+
+        unimplemented!()
+    }
+
+    fn is_straight(&self) -> bool {
+        let mut cards = self.cards;
+        cards.sort();
+        cards.windows(2)
+            .map(|s| s[0].value as u8 - s[1].value as u8)
+            .all(|v| v == 1)
+    }
+
+    fn is_flush(&self) -> bool {
+        self.cards.windows(2).all(|p| p[0].suit == p[1].suit)
     }
 }
 
 pub enum HandScore {
-    HighCard(Card),
-    OnePair(Card),
+    HighCard(Value),
+    OnePair(Value),
     TwoPair(TwoPairScore),
-    ThreeOfAKind(Card),
-    Straight(Card, Card, Card, Card, Card),
-    Flush(Card, Card, Card, Card, Card),
-    FullHouse(Card, Card),
-    FourOfAKind(Card),
-    StraightFlush(Card, Card, Card, Card, Card),
+    ThreeOfAKind(Value),
+    Straight(StraightScore),
+    Flush(FlushScore),
+    FullHouse(FullHouseScore),
+    FourOfAKind(Value),
+    StraightFlush(StraightScore),
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-struct TwoPairScore {
+pub struct TwoPairScore {
     high: Value,
     low: Value,
 }
@@ -44,21 +62,123 @@ impl TwoPairScore {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-struct StraightScore {
+pub struct StraightScore {
     top: Value,
     hi: Value,
     mid: Value,
     low: Value,
     bot: Value,
-    
 }
-impl StraightScore {
-    fn new(c1: Value, c2: Value, c3: Value, c4: Value, c5: Value) -> Result<Self, ()> {
-        let mut cards = [c1, c2, c3, c4, c5,];
-        cards.sort();
-    }
-        
-        
-        
 
+impl StraightScore {
+    fn new(hand: Pokerhand) -> Result<Self, ()> {
+        let Pokerhand { mut cards } = hand;
+        cards.sort();
+        let is_straight = cards
+            .windows(2)
+            .map(|s| s[0].value as u8 - s[1].value as u8)
+            .all(|v| v == 1);
+        if is_straight {
+            let bot = cards[0].value;
+            let low = cards[1].value;
+            let mid = cards[2].value;
+            let hi = cards[3].value;
+            let top = cards[4].value;
+            Ok(StraightScore {
+                top,
+                hi,
+                mid,
+                low,
+                bot,
+            })
+        } else {
+            Err(())
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+pub struct FlushScore {
+    top: Value,
+    hi: Value,
+    mid: Value,
+    low: Value,
+    bot: Value,
+}
+
+impl FlushScore {
+    fn new(hand: Pokerhand) -> Result<Self, ()> {
+        let Pokerhand { mut cards } = hand;
+        cards.sort();
+        let is_flush = cards.windows(2).all(|p| p[0].suit == p[1].suit);
+        if is_flush {
+            let bot = cards[0].value;
+            let low = cards[1].value;
+            let mid = cards[2].value;
+            let hi = cards[3].value;
+            let top = cards[4].value;
+            Ok(FlushScore {
+                top,
+                hi,
+                mid,
+                low,
+                bot,
+            })
+        } else {
+            Err(())
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+pub struct FullHouseScore {
+    triplet: Value,
+    pair: Value,
+}
+
+impl FullHouseScore {
+    fn new(hand: Pokerhand) -> Result<Self, ()> {
+        let Pokerhand { mut cards } = hand;
+        cards.sort();
+
+        if is_three_of_a_kind(&cards[..3]) {
+            if (cards[2].value != cards[3].value) && is_pair(&cards[3..]) {
+                Ok(FullHouseScore {
+                    triplet: cards[0].value,
+                    pair: cards[4].value,
+                })
+            } else {
+                Err(())
+            }
+        } else if is_pair(&cards[..2]) {
+            if is_three_of_a_kind(&cards[2..]) {
+                Ok(FullHouseScore {
+                    triplet: cards[4].value,
+                    pair: cards[0].value,
+                })
+            } else {
+                Err(())
+            }
+        } else {
+            Err(())
+        }
+    }
+}
+
+fn is_three_of_a_kind(cards: &[Card]) -> bool {
+    if cards.len() != 3 {
+        return false;
+    }
+    (cards[0].value == cards[1].value) && (cards[1].value == cards[2].value)
+}
+
+fn is_pair(cards: &[Card]) -> bool {
+    if cards.len() != 2 {
+        return false;
+    }
+    (cards[0].value == cards[1].value)
+}
+
+fn same_value(cards: &[Card]) -> bool {
+    cards.windows(2).all(|w| w[0].value == w[1].value)
 }
